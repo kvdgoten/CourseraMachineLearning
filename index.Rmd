@@ -9,6 +9,9 @@ output:
   pdf_document:
     toc: yes
     toc_depth: '5'
+  word_document:
+    toc: yes
+    toc_depth: '5'
 ---
 
 ```{r setup, include=FALSE}
@@ -22,6 +25,7 @@ library(corrplot)
 library(rpart.plot)
 ```
 
+This is a re-submission. I noticed I made a mistake and redid part of my work. My apologies if you - as a reviewer - see my work twice.
 
 # Background
 
@@ -35,6 +39,24 @@ Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible t
 Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
 
 Read more: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har#ixzz5GisaTutu
+
+# Data Modelling Approach
+
+Because the test set that is provided is one without the to be predicted variable, 
+we can't use this set to estimate accuracy of our models. We need to **cross-validate**
+with a validation data set that we create ourselves. On that validation set we calculate the 
+**out of sample error** estimates. For multiple categories, we could use **overall accuracy** may be used.
+
+1. data are loaded and prepared
+2. data are splitted in a training and validation set
+3. for each model
+    + build a model on the training set
+    + calculate training performance
+    + calculate *out of sample error* estimates on the validation set
+4. compare models and select the best
+5. predict with the best model using the provided *test data set*
+
+
 
 # Data Loading and Preparation
 
@@ -87,18 +109,45 @@ par(cex = cex.before)
 
 # Model Building
 
-## Trees
+## Cross validation sets
 
-```{r model_tree, cache=TRUE}
+```{r}
 
-fit_tree <- train(classe ~ . , method = "rpart", data = training)
-rpart.plot(fit_tree$finalModel)
-confusionMatrix(fit_tree)
-rpart.plot(fit_tree$finalModel)
+set.seed(1234)
+inTrain = createDataPartition(training$classe, p = 0.70)[[1]]
+training = training[ inTrain,]
+validation = training[-inTrain ,]
+dim(training); dim(validation)
+
 ```
 
 
 
+## Trees Model
+
+### Build model on training set
+```{r model_tree, cache=TRUE}
+
+fit_tree <- train(classe ~ . , method = "rpart", data = training)
+rpart.plot(fit_tree$finalModel)
+
+
+```
+
+### Performance on the training set
+```{r model_tree_train}
+confusionMatrix(fit_tree)
+
+```
+
+
+### Performance on the validation set
+```{r model_tree_val}
+pred_tree <- predict(fit_tree, newdata = validation)
+cm_tree_val <- confusionMatrix(reference = validation$classe, data = pred_tree)
+cm_tree_val$overall[1]
+```
+The **out of sample error estimate** for the tree model is `r round(cm_tree_val$overall[1], 2)`
 
 
 ## RandomForest with parallel processing
@@ -112,7 +161,7 @@ detectCores(); detectCores(logical = FALSE)
 ```
 
 
-### Build RandomForest Model
+### Build Model on training set
 ```{r RandomForest, cache=TRUE}
 
 cluster <- makeCluster(detectCores()-1) # convention to leave 1 core for OS
@@ -129,13 +178,27 @@ confusionMatrix(fit_rf$finalModel$predicted, training$classe)
 
 ```
 
-## Performance of models
 
-1. The accuracy of the Tree model was 0.498
-2. The accuracy of the Random Forest Model was 0.996
-We continue with the latter model to do predictions
+### Performance on the training set
+```{r model_rf_train}
+confusionMatrix(fit_rf)
 
-**The out of sample error for the Random Forest Model is: 0.4 percent**
+```
+
+### Performance on the validation set
+```{r model_rf_val}
+pred_rf <- predict(fit_rf, newdata = validation)
+cm_rf_val <- confusionMatrix(reference = validation$classe, data = pred_rf)
+cm_rf_val$overall[1]
+```
+
+The **out of sample error estimate** for the random forest model is close to `r cm_rf_val$overall[1]`
+
+
+## Compare models and select the best
+
+From the above it is clear the the Random Forest model is the best. Hence we will use
+this model to predict.
 
 # Predict with the best model: Random Forest Based
 ```{r PredictRF}
