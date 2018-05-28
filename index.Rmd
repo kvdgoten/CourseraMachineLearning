@@ -3,12 +3,12 @@ title: "Coursera Machine Learning Assignment"
 author: "KVdG"
 date: "May 27 2018"
 output:
-  pdf_document:
-    toc: yes
-    toc_depth: '5'
   html_document:
     toc: yes
     toc_depth: 5
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
 ---
 
 ```{r setup, include=FALSE}
@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r Init, include=FALSE}
 library(caret)
 library(dplyr)
-library(qtlcharts) # for the visualisation
+library(corrplot)
 library(rpart.plot)
 ```
 
@@ -36,7 +36,7 @@ Six young health participants were asked to perform one set of 10 repetitions of
 
 Read more: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har#ixzz5GisaTutu
 
-# Data Loading, Preparation, and Visualisation
+# Data Loading and Preparation
 
 ```{r DataLoad, cache=TRUE}
 
@@ -65,17 +65,23 @@ testing <- testing[, NA_testing]
 
 ```
 
-## A quick visualisation
+<!-- ## A quick visualisation -->
 
-For people unfamiliar with this visualisation: you can click on a cell in the heatmap and then the scatterplot will reveal the variables that reference the cell clicked.
+<!-- It was impossible to include a detailed visualisation (too big for github?) -->
 
-```{r QuickViz, cache=TRUE, warning=FALSE}
+<!-- For people unfamiliar with this visualisation: the higher the correlation, the darker the color (red for negative, blue for positive). Hence, the lower correlations are less visible. -->
+
+
+```{r QuickViz, eval=FALSE, warning=FALSE, cache=TRUE, include=FALSE}
  
-# names(grep("factor", sapply(testing, class), value=TRUE))
 # names(grep("factor", sapply(training, class), value=TRUE))
 
-### cor heatmap + scatterplot of selected
-iplotCorr(training  %>% select(-classe), reorder = TRUE)
+### cor graph
+cex.before <- par("cex")
+par(cex = 0.3)
+corrplot(cor( training  %>% select(-classe) ), title="\nCorrelations", 
+             type="lower", method="number")
+par(cex = cex.before)
 
 ```
 
