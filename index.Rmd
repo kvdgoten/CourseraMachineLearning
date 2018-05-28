@@ -1,0 +1,146 @@
+---
+title: "Coursera Machine Learning Assignment"
+author: "KVdG"
+date: "May 27 2018"
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: '5'
+  html_document:
+    toc: yes
+    toc_depth: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r Init, include=FALSE}
+library(caret)
+library(dplyr)
+library(qtlcharts) # for the visualisation
+library(rpart.plot)
+```
+
+
+# Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+# Some information about the data set
+
+(The text below is copied from the HAR website.)
+
+Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E).
+
+Read more: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har#ixzz5GisaTutu
+
+# Data Loading, Preparation, and Visualisation
+
+```{r DataLoad, cache=TRUE}
+
+f1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+f2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+pml_training.csv <- read.csv(file = f1, header = TRUE )
+pml_testing.csv <- read.csv(file = f2, header = TRUE )
+rm(f1, f2)
+
+```
+
+```{r DataPrep, cache=TRUE}
+
+## remove columns with subject variables (the first 7)
+training <- pml_training.csv[ , -c(1:7) ]
+testing <- pml_testing.csv[ , -c(1:7) ]
+
+## remove columns with NAs
+NA_training <- which(colSums(is.na(training)) == 0)
+NA_testing <-  which(colSums(is.na(testing)) == 0)
+
+# There are more columns with NAs in the test set, hence we take this list
+# to clean both train and test set
+training <- training[, NA_testing]
+testing <- testing[, NA_testing]
+
+```
+
+## A quick visualisation
+
+For people unfamiliar with this visualisation: you can click on a cell in the heatmap and then the scatterplot will reveal the variables that reference the cell clicked.
+
+```{r QuickViz, cache=TRUE, warning=FALSE}
+ 
+# names(grep("factor", sapply(testing, class), value=TRUE))
+# names(grep("factor", sapply(training, class), value=TRUE))
+
+### cor heatmap + scatterplot of selected
+iplotCorr(training  %>% select(-classe), reorder = TRUE)
+
+```
+
+# Model Building
+
+## Trees
+
+```{r model_tree, cache=TRUE}
+
+fit_tree <- train(classe ~ . , method = "rpart", data = training)
+rpart.plot(fit_tree$finalModel)
+confusionMatrix(fit_tree)
+rpart.plot(fit_tree$finalModel)
+```
+
+
+
+
+
+## RandomForest with parallel processing
+### Prepare for parallel processing
+```{r PrepParallel, warning=FALSE}
+
+library(doParallel)
+library(parallel)
+detectCores(); detectCores(logical = FALSE)
+
+```
+
+
+### Build RandomForest Model
+```{r RandomForest, cache=TRUE}
+
+cluster <- makeCluster(detectCores()-1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+fitControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+fit_rf <- train(classe ~ . , method = "rf", data = training, trControl = fitControl)
+
+stopCluster(cluster)
+registerDoSEQ()
+
+confusionMatrix(fit_rf$finalModel$predicted, training$classe)
+
+```
+
+## Performance of models
+
+1. The accuracy of the Tree model was 0.498
+2. The accuracy of the Random Forest Model was 0.996
+We continue with the latter model to do predictions
+
+**The out of sample error for the Random Forest Model is: 0.4 percent**
+
+# Predict with the best model: Random Forest Based
+```{r PredictRF}
+
+# print(fit_rf$finalModel)
+
+pred_rf <- predict(fit_rf, newdata = testing)
+print(pred_rf)
+
+```
+
+# Conclusion
+
+Several models were tested, two were selected for reporting as they provide insight. The tree model has limited accuracy, while the random forest model is very good in predicting. 
